@@ -1,0 +1,5 @@
+train: ../classification/data/train
+val:   ../classification/data/val
+
+nc: 2
+names: ['positive', 'negative']

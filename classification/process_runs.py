@@ -38,9 +38,10 @@ def process_runs_directory():
         else:
             dropout = None
             
-        # Read results.csv
-        results_path = folder / 'results.csv'
-        if results_path.exists():
+        # Read results.csv (renamed to experimentN_results.csv for the committed runs)
+        candidates = [folder / 'results.csv', *folder.glob('experiment*_results.csv')]
+        results_path = next((p for p in candidates if p.exists()), None)
+        if results_path is not None:
             df = pd.read_csv(results_path)
             metrics = df.to_dict('records')
         else:
@@ -77,10 +78,10 @@ def plot_metrics_progression(results):
             dropout_groups[dropout] = []
         dropout_groups[dropout].append(data)
     
-    # Select best run for each dropout rate (lowest final loss)
+    # Select best run for each dropout rate (lowest final validation loss)
     best_runs = {}
     for dropout, runs in dropout_groups.items():
-        best_run = min(runs, key=lambda x: x['metrics'][-1].get('loss', float('inf')))
+        best_run = min(runs, key=lambda x: x['metrics'][-1].get('val/loss', float('inf')))
         best_runs[dropout] = best_run
     
     # Get unique dropout rates and assign colors

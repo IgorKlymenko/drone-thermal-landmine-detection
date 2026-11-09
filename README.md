@@ -24,7 +24,7 @@ Full technical report, covering architecture, training curves and results: [docs
 
 The raw dataset, the intermediate folders and the final train/val splits are all committed, so you can train straight away:
 
-    pip install ultralytics scikit-learn
+    pip install -r requirements.txt
     cd classification
     python train.py
 
@@ -94,4 +94,3 @@ Tenorio Tamayo et al., *Test Images of Buried Landmines*, v4, Mendeley Data, 202
 - No held-out test set. The final pipeline only makes train/val. `preprocessing/stratify.py` builds a depth-stratified train/val/test split, but nothing trains on it yet.
 - The split is per image, not per flight, so frames from the same flight and zone can land in both train and val. A leave-one-flight-out split would be a fairer test.
 - The dataset doesn't record time of day, season or ambient temperature, so there's no evidence yet that this generalises beyond these five flights.
-- No `requirements.txt` yet, and `process_runs.py` expects `results.csv`, while the committed runs were renamed to `experimentN_results.csv`.

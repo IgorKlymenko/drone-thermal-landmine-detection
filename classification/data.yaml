@@ -1,5 +1,5 @@
-train: ../classification/data/train
-val:   ../classification/data/val
+train: ../classification/train
+val:   ../classification/val
 
 nc: 2
-names: ['positive', 'negative']
+names: ['negative', 'positive']

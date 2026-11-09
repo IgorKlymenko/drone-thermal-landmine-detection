@@ -35,6 +35,11 @@ To rebuild the splits from the raw data:
     cd utils && python sort_images.py        # raw -> data/sorted/{0cm,1cm,5cm,10cm,free_zone}
     # then run the last cell of classification/step_1_preprocessing.ipynb
 
+To reproduce the held-out test result (train/val/test split, then train and score on test):
+
+    cd preprocessing && python stratify.py    # -> data/stratified/{train,val,test}/{positive,negative}
+    cd ../classification && python train_test_split.py
+
 The scripts use paths relative to their own folder, so run each one from the directory it's in.
 
 ## How it works
@@ -81,6 +86,22 @@ So it missed 3 of 261 mine images and flagged 2 of 33 free-zone images as mines.
 
 *Validation accuracy per epoch for each dropout setting.*
 
+That 98.3% comes from the same validation set that picked the dropout and the
+best epoch, so it's a little optimistic. To get a clean number I re-split the
+data 70/10/20, stratified by burial depth (`preprocessing/stratify.py`), and
+retrained with dropout 0.3. Then I scored the best weights once on the 196 test
+images, which played no part in training or selection
+(`classification/train_test_split.py`):
+
+|                     | actual mine | actual free zone |
+|---------------------|-------------|------------------|
+| predicted mine      | 167         | 1                |
+| predicted free zone | 7           | 21               |
+
+**Test accuracy is 95.9% (188/196).** It missed 7 of 174 mine images and
+flagged 1 of 22 free-zone images as a mine. Results are in
+`classification/runs/classify/stratified_test_eval/`.
+
 ## Stack
 
 Python, Ultralytics YOLO11, PyTorch, scikit-learn, Pillow, NumPy, pandas, matplotlib, Jupyter, Google Colab.
@@ -91,6 +112,6 @@ Tenorio Tamayo et al., *Test Images of Buried Landmines*, v4, Mendeley Data, 202
 
 ## Status
 
-- No held-out test set. The final pipeline only makes train/val. `preprocessing/stratify.py` builds a depth-stratified train/val/test split, but nothing trains on it yet.
-- The split is per image, not per flight, so frames from the same flight and zone can land in both train and val. A leave-one-flight-out split would be a fairer test.
+- The split is per image, not per flight, so frames from the same flight and zone can land in both train and test. A leave-one-flight-out split would be a tougher test.
+- Most test errors are missed mines (7 vs 1 false alarm). For field use I'd tune the decision threshold toward recall.
 - The dataset doesn't record time of day, season or ambient temperature, so there's no evidence yet that this generalises beyond these five flights.

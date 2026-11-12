@@ -56,7 +56,7 @@ The validation set stays lopsided (261 vs 33), and answering "mine" every time a
 
 <img src="classification/runs/classify/train1/confusion_matrix_normalized.png" width="420" alt="Normalized validation confusion matrix for dropout 0.3">
 
-<sub>Validation, dropout 0.3, normalized per true class: 94% of free-zone frames and 99% of mine frames come out right. The empty `.ipynb_checkpoints` row is Colab's checkpoint folder, picked up as a third class. It was empty, so nothing broke.</sub>
+<sub>Validation, dropout 0.3, normalized per true class: 94% of free-zone frames and 99% of mine frames come out right.</sub>
 
 That 98.3% is also a bit optimistic, because the same set picked the dropout and the epoch. For a clean number I re-split 70/10/20 stratified by depth, retrained, and scored the test set exactly once:
 

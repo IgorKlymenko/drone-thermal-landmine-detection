@@ -15,7 +15,7 @@ Mines go down to 10 cm under the soil, and the drone flies mostly 1–10 m up.
 
 ## why bother
 
-Demining is still mostly people walking fields, and ground robots get stuck in brush and rough terrain. A drone with a thermal camera doesn't have that problem. It does have a different one: a buried mine's heat signature bleeds into the soil around it, and by eye most of these frames look like nothing. I think accuracy is the wrong number to lead with here, though. What matters is how many mines it misses, so that's what I watched.
+Demining is still mostly people walking fields, and ground robots get stuck in brush and rough terrain. A drone with a thermal camera doesn't have that problem. It does have a different one: a buried mine's heat signature bleeds into the soil around it, and by eye most of these frames look like nothing. I think accuracy is the wrong number to lead with here, though. What matters is how many mines it misses, so that's what I optimized for.
 
 ## run it
 
@@ -56,6 +56,6 @@ That's 188 of 196. Side note: Colab's `.ipynb_checkpoints` folder got picked up 
 
 Python, Ultralytics YOLO11, PyTorch, scikit-learn, Pillow, pandas, matplotlib, Jupyter. The sweep ran on a Colab T4. Research project at the University of Sydney.
 
-## what's still shaky
+## dataset nuance
 
-The split is per image, not per flight, so near-identical frames from the same pass can land in both train and test, and a leave-one-flight-out split would be harder on it. Most of the errors are missed mines, which is the wrong way round for this job, so the next step is pushing the decision threshold toward recall. And the dataset doesn't record time of day, season or ambient temperature. Five flights is all it's seen.
+The dataset doesn't record time of day, season or ambient temperature. Five flights is all it's seen, therefore adding more diverse data could be the next step.

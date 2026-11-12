@@ -1,117 +1,61 @@
-# Thermal Landmine Detection
+# Drone Thermal Landmine Detection
 
-Landmine detection from drone thermal imagery, developed at the University of Sydney. A fine-tuned YOLO11n classifier decides whether a frame shows a buried or surface mine or clear ground. It's trained on a published field dataset recorded over real test minefields at Universidad del Valle, Colombia.
+YOLO11n fine-tuned to spot landmines in drone thermal images. Trained on a public dataset of flights over real test minefields at Universidad del Valle, Colombia.
+
+Write-up with the architecture, training curves and results: [docs/report.pdf](docs/report.pdf)
 
 <p>
   <img src="classification/runs/classify/train1/val_batch0_pred.jpg" height="330" alt="Model predictions on a validation batch">
   <img src="docs/process.gif" height="330" alt="Data, predictions, accuracy curve and confusion matrix">
 </p>
 
-*Left: predictions on a validation batch from the best run ("positive" = mine). Right: data, predictions, accuracy per epoch and confusion matrix.*
+95.9% on 196 held-out test images it never saw during training.
+It missed 7 of the 174 mine images, and raised one false alarm.
+Mines go down to 10 cm under the soil, and the drone flies mostly 1–10 m up.
 
-## Why I built this
+## why bother
 
-Demining is still mostly done by hand, and ground robots struggle with rough
-terrain and vegetation, so drone thermal imaging is a promising alternative.
-The catch is that a mine's heat signature bleeds into the soil around it, which
-makes it nearly invisible to the eye. I wanted to find out whether a small
-pretrained CNN could still pick it out, optimising for the metric that matters
-in the field: not missing mines.
+Demining is still mostly people walking fields, and ground robots get stuck in brush and rough terrain. A drone with a thermal camera doesn't have that problem. It does have a different one: a buried mine's heat signature bleeds into the soil around it, and by eye most of these frames look like nothing. I think accuracy is the wrong number to lead with here, though. What matters is how many mines it misses, so that's what I watched.
 
-Full technical report, covering architecture, training curves and results: [docs/report.pdf](docs/report.pdf).
+## run it
 
-## Run it locally
+You need Python 3.12 (what I've tested with) and [uv](https://docs.astral.sh/uv/). The dataset and splits are committed, so there's nothing to download besides the pretrained weights, which Ultralytics fetches on first run.
 
-The raw dataset, the intermediate folders and the final train/val splits are all committed, so you can train straight away:
+    uv venv --python 3.12 && source .venv/bin/activate
+    uv pip install -r requirements.txt
+    cd classification && python train.py
 
-    pip install -r requirements.txt
-    cd classification
-    python train.py
+That's a quick 5-epoch sanity run. To reproduce the test number, rebuild the split and train properly (20 epochs, about 12 minutes on an M1 CPU):
 
-That's a 5-epoch run at 320px with dropout 0.75. The pretrained `yolo11n-cls.pt` weights download on first run, and results go to `classification/runs/classify/`. The real experiments were 20-epoch runs on a Colab T4 (`train_experiment.py`).
+    python preprocessing/stratify.py
+    python classification/train_test_split.py
 
-To rebuild the splits from the raw data:
+`utils/sort_images.py` turns the raw flight folders into `data/sorted/`, but that's already committed, and it has to be run from inside `utils/`.
 
-    cd utils && python sort_images.py        # raw -> data/sorted/{0cm,1cm,5cm,10cm,free_zone}
-    # then run the last cell of classification/step_1_preprocessing.ipynb
+## from flight folders to yes/no
 
-To reproduce the held-out test result (train/val/test split, then train and score on test):
-
-    cd preprocessing && python stratify.py    # -> data/stratified/{train,val,test}/{positive,negative}
-    cd ../classification && python train_test_split.py
-
-The scripts use paths relative to their own folder, so run each one from the directory it's in.
-
-## How it works
-
-    data/DatainBrief_dataset_1/<flight date>/{JPG,R_JPG}/<"Zone N Mine X cm depth">
-            |  utils/sort_images.py   parse depth out of folder names
-            v
-    data/sorted/{0cm, 1cm, 5cm, 10cm, free_zone}
-            |  step_1_preprocessing.ipynb   70/30 split, then augment train negatives
-            v
-    classification/{train,val}/{positive,negative}
-            |  train_experiment.py   YOLO11n-cls, dropout sweep 0.3 / 0.5 / 0.8
-            v
-    runs/classify/trainN   ->  process_runs.py plots per-dropout curves
+The data is Tenorio Tamayo et al., [*Test Images of Buried Landmines*](https://doi.org/10.17632/732ngnf4r3.4) (Mendeley Data, 2023): five flights with a Zenmuse XT on a DJI Matrice 100, over nine test zones at Universidad del Valle in Colombia. The zones hold legbreaker-style mines and mock objects at 0, 1, 5 and 10 cm. The zone folders are named by hand, typos included (`Zone 5 Sruface Mine 0cm depth`, `Zone 6  free zone`), so `sort_images.py` just grabs the digits before `cm` and files each image by depth. Every depth counts as "mine". I used both JPEG resolutions (720×480 and 336×256) and left the TIFFs alone.
 
 ![One frame per class](docs/samples.png)
-*Left to right: mine at 0, 1, 5 and 10 cm, then free zone.*
+*0, 1, 5 and 10 cm, then a free zone. Good luck spotting the 1 cm one.*
 
-The images come from five drone flights (Zenmuse XT on a DJI Matrice 100, 1–10 m altitude) over nine test zones. Legbreaker-style mines are buried at 0, 1, 5 and 10 cm. Zone folders are named inconsistently (`Zone 1 Mine 1cm depth`, `Zone 5 Sruface Mine 0cm depth`, `Zone 6  free zone`), so `sort_images.py` reads the depth from the digits just before `cm`. Any depth counts as "positive" and the free zone is "negative". I used the two JPEG resolutions and skipped the TIFFs.
+## 108 empty fields vs 870 mines
 
-## The hard part
+The free zone only has 108 images, so the classes are about 8:1. I padded the free-zone side with flips, 90/180/270° rotations and brightness jitter. My first version of the split did that *before* splitting, which put flipped copies of validation images straight into training. The version that shipped splits first and only augments `train/negative` (75 → 300).
 
-Class imbalance without leaking data. There are 870 mine images and only 108
-free-zone ones, roughly 8:1. My first version of the notebook augmented the
-negatives (flip, 90/180/270 rotation, brightness jitter) *before* splitting.
-That meant a flipped copy of a validation image could end up in training, so
-validation numbers would measure memorisation. The final version splits first
-and only augments `train/negative`, taking it from 75 to 300 images. Validation
-stays untouched: 261 positive and 33 negative.
-
-The tradeoff is that validation is still imbalanced. Predicting "mine" every
-time already gets 88.8%, so accuracy alone says little. The best run (dropout
-0.3, `runs/classify/train1/`) reached 98.3% top-1 (289/294). The confusion matrix
-shows what that's made of:
-
-|                     | actual mine | actual free zone |
-|---------------------|-------------|------------------|
-| predicted mine      | 258         | 2                |
-| predicted free zone | 3           | 31               |
-
-So it missed 3 of 261 mine images and flagged 2 of 33 free-zone images as mines.
-
-<img src="classification/plots/metrics_accuracy_top1_progression.png" width="600" alt="Validation accuracy per epoch for dropout 0.3, 0.5 and 0.8">
-
-*Validation accuracy per epoch for each dropout setting.*
-
-That 98.3% comes from the same validation set that picked the dropout and the
-best epoch, so it's a little optimistic. To get a clean number I re-split the
-data 70/10/20, stratified by burial depth (`preprocessing/stratify.py`), and
-retrained with dropout 0.3. Then I scored the best weights once on the 196 test
-images, which played no part in training or selection
-(`classification/train_test_split.py`):
+The validation set stays lopsided (261 vs 33), and answering "mine" every time already scores 88.8%. So the 98.3% from the dropout sweep (0.3 won, `runs/classify/train1/`) is less impressive than it sounds. It's also a bit optimistic, because that same set picked the dropout and the epoch. For a clean number I re-split 70/10/20 stratified by depth, retrained, and scored the test set exactly once:
 
 |                     | actual mine | actual free zone |
 |---------------------|-------------|------------------|
 | predicted mine      | 167         | 1                |
 | predicted free zone | 7           | 21               |
 
-**Test accuracy is 95.9% (188/196).** It missed 7 of 174 mine images and
-flagged 1 of 22 free-zone images as a mine. Results are in
-`classification/runs/classify/stratified_test_eval/`.
+That's 188 of 196. Side note: Colab's `.ipynb_checkpoints` folder got picked up as a third class in the original sweep. It was empty so nothing broke, but it's right there in `train1/confusion_matrix.png`.
 
-## Stack
+## built with
 
-Python, Ultralytics YOLO11, PyTorch, scikit-learn, Pillow, NumPy, pandas, matplotlib, Jupyter, Google Colab.
+Python, Ultralytics YOLO11, PyTorch, scikit-learn, Pillow, pandas, matplotlib, Jupyter. The sweep ran on a Colab T4. Research project at the University of Sydney.
 
-## Data
+## what's still shaky
 
-Tenorio Tamayo et al., *Test Images of Buried Landmines*, v4, Mendeley Data, 2023. https://doi.org/10.17632/732ngnf4r3.4
-
-## Status
-
-- The split is per image, not per flight, so frames from the same flight and zone can land in both train and test. A leave-one-flight-out split would be a tougher test.
-- Most test errors are missed mines (7 vs 1 false alarm). For field use I'd tune the decision threshold toward recall.
-- The dataset doesn't record time of day, season or ambient temperature, so there's no evidence yet that this generalises beyond these five flights.
+The split is per image, not per flight, so near-identical frames from the same pass can land in both train and test, and a leave-one-flight-out split would be harder on it. Most of the errors are missed mines, which is the wrong way round for this job, so the next step is pushing the decision threshold toward recall. And the dataset doesn't record time of day, season or ambient temperature. Five flights is all it's seen.

@@ -6,7 +6,7 @@ Write-up with the architecture, training curves and results: [docs/report.pdf](d
 
 <p>
   <img src="classification/runs/classify/train1/val_batch0_pred.jpg" height="330" alt="Model predictions on a validation batch">
-  <img src="docs/process.gif" height="330" alt="Data, predictions, accuracy curve and confusion matrix">
+  <img src="docs/depths.png" height="330" alt="One thermal frame per burial depth, plus a free zone">
 </p>
 
 95.9% on 196 held-out test images it never saw during training.
